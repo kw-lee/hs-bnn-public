@@ -69,7 +69,7 @@ class FactorizedHierarchicalInvGamma:
 
     def initialize_scale_from_prior(self, seed=0):
         key = jr.PRNGKey(seed)
-        _, key2 = jr.split(key)
+        key1, key2, key3, key4, key5, key6, key7, key8, key9 = jr.split(key, num=9)
         # scale parameters (hidden + observed),
         self.lambda_a_hat = (self.tau_a_prior + self.lambda_a_prior) * jnp.ones([self.tot_outputs, 1]).ravel()
         self.lambda_b_hat = (1.0 / self.lambda_b_prior ** 2) * jnp.ones([self.tot_outputs, 1]).ravel()
@@ -81,28 +81,18 @@ class FactorizedHierarchicalInvGamma:
         self.lambda_a_hat_oplayer = jnp.array(self.tau_a_prior_oplayer + self.lambda_a_prior_oplayer).reshape(-1)
         self.lambda_b_hat_oplayer = (1.0 / self.lambda_b_prior_oplayer ** 2) * jnp.ones([1]).ravel()
         # sample from half cauchy and log to initialize the mean of the log normal
-        sample = jnp.abs(self.lambda_b_prior * (jr.normal(key, [self.tot_outputs]) / jr.normal(key2, [self.tot_outputs])))
-        _, key = jr.split(key2)
-        _, key2 = jr.split(key)
+        sample = jnp.abs(self.lambda_b_prior * (jr.normal(key1, [self.tot_outputs]) / jr.normal(key2, [self.tot_outputs])))
         tau_mu = jnp.log(sample)
-        tau_log_sigma = jr.normal(key, [self.tot_outputs]) - 10.
-        _, key = jr.split(key2)
-        _, key2 = jr.split(key)
+        tau_log_sigma = jr.normal(key3, [self.tot_outputs]) - 10.
         # one tau_global for each hidden layer
         sample = jnp.abs(
-            self.lambda_b_prior_global * (jr.normal(key, [self.num_hidden_layers]) / jr.normal(key2, [self.num_hidden_layers])))
-        _, key = jr.split(key2)
-        _, key2 = jr.split(key)
+            self.lambda_b_prior_global * (jr.normal(key4, [self.num_hidden_layers]) / jr.normal(key5, [self.num_hidden_layers])))
         tau_global_mu = jnp.log(sample)
-        tau_global_log_sigma = jr.normal(key, [self.num_hidden_layers]) - 10.
-        _, key = jr.split(key2)
-        _, key2 = jr.split(key)
+        tau_global_log_sigma = jr.normal(key6, [self.num_hidden_layers]) - 10.
         # one tau for all op layer weights
-        sample = jnp.abs(self.lambda_b_hat_oplayer * (jr.normal(key, ) / jr.normal(key2, )))
-        _, key = jr.split(key2)
-        _, key2 = jr.split(key)
+        sample = jnp.abs(self.lambda_b_hat_oplayer * (jr.normal(key7, ) / jr.normal(key8, )))
         tau_oplayer_mu = jnp.log(sample)
-        tau_oplayer_log_sigma = jr.normal(key, [1]) - 10.
+        tau_oplayer_log_sigma = jr.normal(key9, [1]) - 10.
         if not self.classification:
             log_a = jnp.array(jnp.log(self.noise_a)).reshape(-1)
             log_b = jnp.array(jnp.log(self.noise_b)).reshape(-1)
@@ -181,27 +171,24 @@ class FactorizedHierarchicalInvGamma:
             w, b = mu
             sigma__w, sigma_b = var
             key = jr.PRNGKey(seed)
+            key1, key2 = jr.split(key, num=2)
             if layer_id < len(self.shapes) - 1:
                 scale_mu = 0.5 * (tau_mu + tau_mu_global[layer_id])
                 scale_v = 0.25 * (tau_sigma ** 2 + tau_sigma_global[layer_id] ** 2)
-                scale = jnp.exp(scale_mu + jnp.sqrt(scale_v) * jr.normal(key, [tau_mu.shape[0]]))
-                _, key = jr.split(key)
+                scale = jnp.exp(scale_mu + jnp.sqrt(scale_v) * jr.normal(key1, [tau_mu.shape[0]]))
                 mu_w = jnp.dot(inputs, w) + b
                 v_w = jnp.dot(inputs ** 2, sigma__w ** 2) + sigma_b ** 2
-                outputs = (jnp.sqrt(v_w) / jnp.sqrt(inputs.shape[1])) * jr.normal(key, shape=mu_w.shape) + mu_w
-                _, key = jr.split(key)
+                outputs = (jnp.sqrt(v_w) / jnp.sqrt(inputs.shape[1])) * jr.normal(key2, shape=mu_w.shape) + mu_w
                 outputs = scale * outputs
                 inputs = outputs * (outputs > 0)
             else:
                 op_scale_mu = 0.5 * tau_mu_oplayer
                 op_scale_v = 0.25 * tau_sigma_oplayer ** 2
-                Ekappa_half = jnp.exp(op_scale_mu + jnp.sqrt(op_scale_v) * jr.normal(key, ))
-                _, key = jr.split(key)
+                Ekappa_half = jnp.exp(op_scale_mu + jnp.sqrt(op_scale_v) * jr.normal(key1, ))
                 mu_w = jnp.dot(inputs, w) + b
                 v_w = jnp.dot(inputs ** 2, sigma__w ** 2) + sigma_b ** 2
                 outputs = Ekappa_half * (jnp.sqrt(v_w) / jnp.sqrt(inputs.shape[1])) * jr.normal(
-                    key, shape=mu_w.shape) + mu_w
-                _, key = jr.split(key)
+                    key2, shape=mu_w.shape) + mu_w
         return outputs
 
     def EPw_Gaussian(self, prior_precision, w, sigma):

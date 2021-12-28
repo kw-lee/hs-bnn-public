@@ -5,6 +5,7 @@ import argparse
 import joblib
 import sys
 import jax.numpy as jnp
+import os
 
 sys.path.append(".")
 from src.hs_bnn import HSBnn, predict
@@ -21,7 +22,7 @@ sb.set_context("paper", rc={"lines.linewidth": 5, "lines.markersize":10, 'axes.l
     'axes.labelsize' : 25,  })
 sb.set_style("darkgrid")
 
-def plot_model(mlp, posterior_mode=False, export_path=None):
+def plot_model(mlp, export_path=None):
     plt.figure(figsize = (6, 6))
     X = jnp.sort(mlp.X, axis=0)
     axx = plt.gca()
@@ -32,11 +33,12 @@ def plot_model(mlp, posterior_mode=False, export_path=None):
     y_pred = jnp.concatenate(y_preds, axis=1)
     
     pred_mean = y_pred.mean(axis=1).reshape(-1)
-    pred_std = y_pred.std(axis=1).reshape(-1)
+    pred_std = y_pred.std(axis=1).reshape(-1) + np.sqrt(0.1) # noise_var
     plt.fill_between(X.reshape(-1), y1=pred_mean - 3 * pred_std, y2=pred_mean + 3 * pred_std,
         alpha=0.2)
     plt.plot(X, pred_mean, 'r--')
     plt.scatter(mlp.X, mlp.y, c='blue')
+    
     if export_path: 
         plt.savefig(export_path)
     else:
@@ -48,4 +50,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
     r_path = args.r_path
     model = joblib.load(r_path)
-    plot_model(model, export_path=f'{r_path}.pdf')
+    p_path = os.path.splitext(r_path)[0]
+    plot_model(model, export_path=f'{p_path}_model.pdf')
