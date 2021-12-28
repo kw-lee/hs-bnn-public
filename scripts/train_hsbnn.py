@@ -1,12 +1,15 @@
 import time, os
 import numpy as np
-from sklearn.externals import joblib
+import joblib
+import sys
+sys.path.append(".")
+
 from src.load_data import classification_data, regression_data
 from src.factorized_approximation import FactorizedHierarchicalInvGamma as inference_engine
 from src.hs_bnn import HSBnn, fit
 
 ###### Classification/Regression ##############
-classification = True
+classification = False
 
 #### ARCH Params ##########
 num_hidden_layers = 1

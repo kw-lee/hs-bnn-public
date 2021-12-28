@@ -1,7 +1,8 @@
 from copy import copy
 
-import autograd.numpy as np
-from autograd import grad
+import jax.numpy as jnp
+import numpy as np
+from jax import grad
 from src.optimizers import adam
 from src.utility_functions import make_batches
 

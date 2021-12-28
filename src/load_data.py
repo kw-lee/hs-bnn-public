@@ -1,6 +1,5 @@
-import autograd.numpy as np
-import autograd.numpy.random as npr
-
+import jax.numpy as jnp
+import jax.random as jr
 
 def classification_data(seed=0):
     """
@@ -8,20 +7,20 @@ def classification_data(seed=0):
     :param seed: random number seed
     :return:
     """
-    npr.seed(seed)
-    data = np.load("./data/2D_toy_data_linear.npz")
+    key = jr.PRNGKey(seed)
+    data = jnp.load("./data/2D_toy_data_linear.npz")
     x = data['x']
     y = data['y']
-    ids = np.arange(x.shape[0])
-    npr.shuffle(ids)
+    ids = jnp.arange(x.shape[0])
+    jr.shuffle(key, ids)
     # 75/25 split
-    num_train = int(np.round(0.01*x.shape[0]))
+    num_train = int(jnp.round(0.01*x.shape[0]))
     x_train = x[ids[:num_train]]
     y_train = y[ids[:num_train]]
     x_test = x[ids[num_train:]]
     y_test =y[ids[num_train:]]
-    mu = np.mean(x_train, axis=0)
-    std = np.std(x_train, axis=0)
+    mu = jnp.mean(x_train, axis=0)
+    std = jnp.std(x_train, axis=0)
     x_train = (x_train-mu)/std
     x_test = (x_test-mu)/std
     train_stats = dict()
@@ -37,25 +36,25 @@ def regression_data(seed, data_count=500):
     :param data_count: number of data points.
     :return:
     """
-    np.random.seed(seed)
+    key = jr.PRNGKey(seed)
     noise_var = 0.1
 
-    x = np.linspace(-4, 4, data_count)
-    y = 1*np.sin(x) + np.sqrt(noise_var)*npr.randn(data_count)
+    x = jnp.linspace(-4, 4, data_count)
+    y = 1*jnp.sin(x) + jnp.sqrt(noise_var) * jr.normal(key, [data_count])
 
     train_count = int (0.2 * data_count)
-    idx = npr.permutation(range(data_count))
-    x_train = x[idx[:train_count], np.newaxis ]
-    x_test = x[ idx[train_count:], np.newaxis ]
+    idx = jr.permutation(key, jnp.arange(data_count))
+    x_train = x[idx[:train_count], jnp.newaxis ]
+    x_test = x[ idx[train_count:], jnp.newaxis ]
     y_train = y[ idx[:train_count] ]
     y_test = y[ idx[train_count:] ]
 
-    mu = np.mean(x_train, 0)
-    std = np.std(x_train, 0)
+    mu = jnp.mean(x_train, 0)
+    std = jnp.std(x_train, 0)
     x_train = (x_train - mu) / std
     x_test = (x_test - mu) / std
-    mu = np.mean(y_train, 0)
-    std = np.std(y_train, 0)
+    mu = jnp.mean(y_train, 0)
+    std = jnp.std(y_train, 0)
     y_train = (y_train - mu) / std
     train_stats = dict()
     train_stats['mu'] = mu

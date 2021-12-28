@@ -1,19 +1,19 @@
-import autograd.numpy as np
-from autograd.scipy.special import gammaln, psi
+import jax.numpy as jnp
+from jax.scipy.special import gammaln, digamma
 import seaborn as sb
 import matplotlib.pyplot as plt
 
 
 def diag_gaussian_entropy(log_std, D):
-    return 0.5 * D * (1.0 + np.log(2 * np.pi)) + np.sum(log_std)
+    return 0.5 * D * (1.0 + jnp.log(2 * jnp.pi)) + jnp.sum(log_std)
 
 
 def inv_gamma_entropy(a, b):
-    return np.sum(a + np.log(b) + gammaln(a) - (1 + a) * psi(a))
+    return jnp.sum(a + jnp.log(b) + gammaln(a) - (1 + a) * digamma(a))
 
 
 def log_normal_entropy(log_std, mu, D):
-    return np.sum(log_std + mu + 0.5) + (D / 2) * np.log(2 * np.pi)
+    return jnp.sum(log_std + mu + 0.5) + (D / 2) * jnp.log(2 * jnp.pi)
 
 
 def make_batches(n_data, batch_size):
