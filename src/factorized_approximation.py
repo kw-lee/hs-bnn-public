@@ -214,7 +214,7 @@ class FactorizedHierarchicalInvGamma:
 
     def EP_Gamma(self, Egamma, Elog_gamma):
         """ Enoise precision """
-        return self.noise_a * jnp.log(self.noise_b) - gammaln(self.noise_a) + \
+        return self.noise_a * jnp.log(self.noise_b) - gammaln(self.noise_a) - \
             (- self.noise_a - 1) * Elog_gamma - self.noise_b * Egamma
 
     def EPtaulambda(self, tau_mu, tau_sigma, tau_a_prior, lambda_a_prior,
