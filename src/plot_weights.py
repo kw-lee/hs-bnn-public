@@ -3,6 +3,9 @@ import numpy as np
 import seaborn as sb
 import argparse
 import joblib
+import sys
+
+sys.path.append(".")
 from src.hs_bnn import HSBnn
 
 sb.set_context("paper", rc={"lines.linewidth": 5, "lines.markersize":10, 'axes.labelsize': 8,
@@ -17,7 +20,7 @@ sb.set_context("paper", rc={"lines.linewidth": 5, "lines.markersize":10, 'axes.l
     'axes.labelsize' : 25,  })
 sb.set_style("darkgrid")
 
-def plot_singlelayer_weights(mlp, posterior_mode=False):
+def plot_singlelayer_weights(mlp, posterior_mode=False, export_path=None):
     plt.figure()
     axx = plt.gca()
     if mlp.inference_engine.classification:
@@ -45,13 +48,17 @@ def plot_singlelayer_weights(mlp, posterior_mode=False):
             sb.boxplot(data=wstack[:, idx[-20:]], orient="h", ax=axx)
         else:
             sb.boxplot(data=wstack[:, idx], orient="h", ax=axx)
-        plt.show(block=True)
+    
+        if export_path: 
+            plt.savefig(export_path)
+        else:
+            plt.show(block=True)
         return wstack
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("r_path")
     args = parser.parse_args()
-    r_path =args.r_path
+    r_path = args.r_path
     model = joblib.load(r_path)
-    plot_singlelayer_weights(model)
+    plot_singlelayer_weights(model, export_path=f'{r_path}.pdf')

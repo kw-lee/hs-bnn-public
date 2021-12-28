@@ -214,8 +214,8 @@ class FactorizedHierarchicalInvGamma:
 
     def EP_Gamma(self, Egamma, Elog_gamma):
         """ Enoise precision """
-        return self.noise_a * jnp.log(self.noise_b) - gammaln(self.noise_a) + (
-                                                            - self.noise_a - 1) * Elog_gamma - self.noise_b * Egamma
+        return self.noise_a * jnp.log(self.noise_b) - gammaln(self.noise_a) + \
+            (- self.noise_a - 1) * Elog_gamma - self.noise_b * Egamma
 
     def EPtaulambda(self, tau_mu, tau_sigma, tau_a_prior, lambda_a_prior,
                     lambda_b_prior, lambda_a_hat, lambda_b_hat):
@@ -237,17 +237,15 @@ class FactorizedHierarchicalInvGamma:
                                                                                     self.lambda_b_hat_oplayer)
         return ent_w, ent_tau, ent_lambda
 
-    def compute_elbo_contribs(self, params, x, y):
+    def compute_elbo_contribs(self, params, x, y, seed=0):
         if self.classification:
             w_vect, sigma, tau_mu, tau_sigma, tau_mu_global, tau_sigma_global, tau_mu_oplayer, tau_sigma_oplayer \
                 = self.unpack_params(params)
         else:
             w_vect, sigma, tau_mu, tau_sigma, tau_mu_global, tau_sigma_global, tau_mu_oplayer, tau_sigma_oplayer, \
             Elog_gamma, Egamma = self.unpack_params(params)
-        seed = 0
         preds = self.lrpm_forward_pass(w_vect, sigma, tau_mu, tau_sigma,
                                        tau_mu_global, tau_sigma_global, tau_mu_oplayer, tau_sigma_oplayer, x, seed)
-        seed += 1
         if self.classification:
             preds = preds - logsumexp(preds, axis=1, keepdims=True)
             log_lik = jnp.sum(jnp.sum(y * preds, axis=1), axis=0)
@@ -273,18 +271,15 @@ class FactorizedHierarchicalInvGamma:
             ent_lambda = ent_lambda + self.noise_entropy  # hack add it to lambda entropy
         return log_lik, log_prior, ent_w, ent_tau, ent_lambda
 
-
-    def compute_train_err(self, params, X, y):
+    def compute_train_err(self, params, X, y, seed=0):
         if self.classification:
             W_vect, sigma, tau_mu, tau_sigma, tau_mu_global, tau_sigma_global, tau_mu_oplayer, tau_sigma_oplayer = \
                 self.unpack_params(params)
         else:
             W_vect, sigma, tau_mu, tau_sigma, tau_mu_global, tau_sigma_global, tau_mu_oplayer, tau_sigma_oplayer, _, _ \
                 = self.unpack_params(params)
-        seed = 0
         preds = self.lrpm_forward_pass(W_vect, sigma, tau_mu, tau_sigma, tau_mu_global, tau_sigma_global,
                                        tau_mu_oplayer, tau_sigma_oplayer, X, seed)
-        seed += 1
 
         if self.classification:
             preds = jnp.exp(preds - logsumexp(preds, axis=1, keepdims=True))
@@ -295,7 +290,7 @@ class FactorizedHierarchicalInvGamma:
         else:
             return jnp.sqrt(jnp.mean((preds - y.reshape(-1, 1)) ** 2))
 
-    def compute_test_ll(self, params, x, y_test, num_samples=1):
+    def compute_test_ll(self, params, x, y_test, num_samples=1, seed=0):
         if self.classification:
             W_vect, sigma, tau_mu, tau_sigma, tau_mu_global, tau_sigma_global, tau_mu_oplayer, tau_sigma_oplayer = \
                 self.unpack_params(params)
@@ -306,9 +301,11 @@ class FactorizedHierarchicalInvGamma:
         # test_ll = jnp.zeros([num_samples, y_test.shape[0]])
         test_ll = []
         test_ll_dict = dict()
+        key = jr.PRNGKey(seed)
+        seeds = jr.randint(key, shape=[num_samples], minval=0, maxval=1000000)
         for i in jnp.arange(num_samples):
             y = self.lrpm_forward_pass(W_vect, sigma, tau_mu, tau_sigma, tau_mu_global, tau_sigma_global,
-                                       tau_mu_oplayer, tau_sigma_oplayer, x, seed=i)
+                                       tau_mu_oplayer, tau_sigma_oplayer, x, seed=seeds[i])
             if y_test.ndim == 1:
                 y = y.ravel()
             if self.classification:

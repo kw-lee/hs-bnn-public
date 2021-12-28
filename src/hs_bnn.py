@@ -5,7 +5,7 @@ import numpy as np
 from jax import grad
 from src.optimizers import adam
 from src.utility_functions import make_batches
-
+from jax.scipy.special import logsumexp
 
 class HSBnn:
     def __init__(self, layer_sizes, train_stats, x, y, x_test, y_test, inference_engine, classification=False,
@@ -37,7 +37,7 @@ class HSBnn:
                                                  classification=classification, n_data=self.X.shape[0],
                                                  n_weights=self.N_weights)
 
-    def neg_elbo(self, params, epoch, x, y):
+    def neg_elbo(self, params, epoch, x, y, seed=0):
         if self.warm_up:
             nt = 200  # linear increments between 0 and 1 up to nt (1 after nt)
             temperature = epoch/nt
@@ -45,42 +45,44 @@ class HSBnn:
                 temperature = 1
         else:
             temperature = 1
-        log_lik, log_prior, ent_w, ent_tau, ent_lam = self.inference_engine.compute_elbo_contribs(params, x, y)
+        log_lik, log_prior, ent_w, ent_tau, ent_lam = self.inference_engine.compute_elbo_contribs(params, x, y, seed)
         log_variational = ent_w + ent_tau + ent_lam
         minibatch_rescaling = 1./self.M
         ELBO = temperature * minibatch_rescaling * (log_variational + log_prior) + log_lik
         return -1*ELBO
 
-    def variational_objective(self, params, t):
+    def variational_objective(self, params, t, seed=0):
         idx = self.batches[t % self.M]
-        return self.neg_elbo(params, t/self.M, self.X[idx], self.y[idx])
+        return self.neg_elbo(params, t/self.M, self.X[idx], self.y[idx], seed)
 
-    def compute_optimal_test_ll(self, num_samples=100):
+    def compute_optimal_test_ll(self, num_samples=100, seed=0):
         if not self.polyak:
             return self.inference_engine.compute_test_ll(self.variational_params, self.X_test,
-                                                         self.y_test, num_samples=num_samples)
+                                                         self.y_test, num_samples=num_samples,
+                                                         seed=seed)
         else:
             return self.inference_engine.compute_test_ll(self.polyak_params, self.X_test,
-                                                         self.y_test, num_samples=num_samples)
+                                                         self.y_test, num_samples=num_samples,
+                                                         seed=seed)
 
 
-def fit(model, n_epochs=10, l_rate=0.01):
+def fit(model, n_epochs=10, l_rate=0.01, verbose=100):
     def callback(params, t, g, decay=0.999):
         if model.polyak:
             # exponential moving average.
             model.polyak_params = decay * model.polyak_params + (1 - decay) * params
-        score = -model.variational_objective(params, t)
+        score = -model.variational_objective(params, t, t)
         model.elbo.append(score)
         if (t % model.M) == 0:
             if model.polyak:
-                val_ll, val_err = model.inference_engine.compute_test_ll(model.polyak_params, model.X_test, model.y_test)
+                val_ll, val_err = model.inference_engine.compute_test_ll(model.polyak_params, model.X_test, model.y_test, seed=t)
             else:
-                val_ll, val_err = model.inference_engine.compute_test_ll(params, model.X_test, model.y_test)
-            train_err = model.inference_engine.compute_train_err(params, model.X, model.y)
+                val_ll, val_err = model.inference_engine.compute_test_ll(params, model.X_test, model.y_test, seed=t)
+            train_err = model.inference_engine.compute_train_err(params, model.X, model.y, seed=t)
             model.val_ll.append(val_ll)
             model.val_err.append(val_err)
             model.train_err.append(train_err)
-            if ((t / model.M) % 10) == 0:
+            if ((t / model.M) % verbose) == 0:
                 if model.inference_engine.classification:
                     print("Epoch {} lower bound {} train_err {} test_err {} ".format(t/model.M, model.elbo[-1],
                                                                                      train_err,
@@ -110,3 +112,19 @@ def fit(model, n_epochs=10, l_rate=0.01):
                                     polyak=model.polyak)
     return model
 
+def predict(model, X, seed=0):
+    if model.inference_engine.classification:
+        W_vect, sigma, tau_mu, tau_sigma, tau_mu_global, tau_sigma_global, tau_mu_oplayer, tau_sigma_oplayer = \
+           model.inference_engine.unpack_params(model.variational_params)
+    else:
+        W_vect, sigma, tau_mu, tau_sigma, tau_mu_global, tau_sigma_global, tau_mu_oplayer, tau_sigma_oplayer, _, _ \
+            = model.inference_engine.unpack_params(model.variational_params)
+    preds = model.inference_engine.lrpm_forward_pass(W_vect, sigma, tau_mu, tau_sigma, tau_mu_global, tau_sigma_global,
+                                    tau_mu_oplayer, tau_sigma_oplayer, X, seed)
+
+    if model.inference_engine.classification:
+        preds = jnp.exp(preds - logsumexp(preds, axis=1, keepdims=True))
+        pred_labels = jnp.argmax(preds, axis=1)
+        return pred_labels
+    else:
+        return preds

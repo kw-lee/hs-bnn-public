@@ -18,7 +18,7 @@ num_nodes = 20
 #### LEARNING Params ###########
 batch_size = 512
 learning_rate = 0.005
-num_iterations = 5000
+num_iterations = 1000
 polyak = False  # polyak averaging
 
 # sparsity parameter
@@ -40,7 +40,7 @@ num_epochs = int(np.ceil(num_iterations / (x_train.shape[0] / batch_size)))
 print("Num Epochs {0} {1}".format(num_epochs, x_train.shape[0]))
 mlp = HSBnn(layer_sizes, train_stats, x_train, y_train, x_test, y_test, inference_engine,
             classification=classification, batch_size=batch_size, lambda_b_global=lambda_b_global, polyak=polyak)
-mlp = fit(mlp, n_epochs=num_epochs, l_rate=learning_rate)
+mlp = fit(mlp, n_epochs=num_epochs, l_rate=learning_rate, verbose=100)
 save_date = time.strftime("%m_%d_%Y")
 if classification:
     save_path = "./results/Classification/{0}".format(save_date)
